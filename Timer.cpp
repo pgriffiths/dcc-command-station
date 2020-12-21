@@ -49,4 +49,12 @@ ISR(TIMER2_OVF_vect)
     TimerB.isrCallback();
 }
 
+#elif defined(ARDUINO_SAMD_ZERO)
+
+#include "ATSAMD21/Timer.h"
+
+Timer TimerA((TcCount16*)TC3);
+Timer TimerB((TcCount16*)TC4);
+
+
 #endif
