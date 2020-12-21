@@ -42,9 +42,9 @@ void DCCWaveform::begin(MotorDriver * mainDriver, MotorDriver * progDriver, byte
   switch (timerNumber) {
     case 1: interruptTimer= &TimerA; break;
     case 2: interruptTimer= &TimerB; break;
-#ifndef ARDUINO_AVR_UNO  
-    case 3: interruptTimer= &TimerC; break;
-#endif    
+// #ifndef ARDUINO_AVR_UNO  
+//     case 3: interruptTimer= &TimerC; break;
+// #endif    
     default:
       DIAG(F("\n\n *** Invalid Timer number %d requested. Only 1..3 valid.  DCC will not work.*** \n\n"), timerNumber);
       return;

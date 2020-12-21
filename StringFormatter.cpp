@@ -19,6 +19,11 @@
 #include "StringFormatter.h"
 #include <stdarg.h>
 
+#if defined(ARDUINO_SAMD_ZERO) && defined(SERIAL_PORT_USBVIRTUAL)
+  // Required for Serial on Zero based boards
+  #define SerialUSB SERIAL_PORT_USBVIRTUAL
+#endif
+
 #if defined(ARDUINO_ARCH_SAMD)
    // Some processors use a gcc compiler that renames va_list!!!
   #include <cstdarg>
