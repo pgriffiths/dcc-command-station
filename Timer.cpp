@@ -56,5 +56,17 @@ ISR(TIMER2_OVF_vect)
 Timer TimerA((TcCount16*)TC3);
 Timer TimerB((TcCount16*)TC4);
 
+void TC3_Handler() 
+{
+    TcCount16* TC = (TcCount16*) TC3;
+    // If this interrupt is due to the compare register matching the timer count
+    // we toggle the LED.
+    if (TC->INTFLAG.bit.MC0 == 1) 
+    {
+        TC->INTFLAG.bit.MC0 = 1;
+
+        // Write callback here!!!
+    }
+}
 
 #endif
