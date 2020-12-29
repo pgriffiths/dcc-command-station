@@ -28,13 +28,24 @@
 ExternalEEPROM EEPROM;
 #endif
 
-void EEStore::init(){
+void EEStore::init()
+{
+    DIAG(F("Start EEStore::init..."));
 #if defined(ARDUINO_ARCH_SAMD)
-    EEPROM.begin(0x50);     // Address for Microchip 24-series EEPROM with all three A pins grounded (0b1010000 = 0x50)
+    DIAG(F("Built for external EEPROM."));
+    Wire.begin();
+    delay(500);
+
+    if (EEPROM.begin() == false)
+    {
+      DIAG(F("No EEPROM memory detected. Freezing."));
+      while (1)
+        ;
+    }
 #endif
 
     eeStore=(EEStore *)calloc(1,sizeof(EEStore));
-    
+
     EEPROM.get(0,eeStore->data);                                       // get eeStore data
 
     if(strncmp(eeStore->data.id,EESTORE_ID,sizeof(EESTORE_ID))!=0){    // check to see that eeStore contains valid DCC++ ID
@@ -49,7 +60,7 @@ void EEStore::init(){
     Turnout::load();    // load turnout definitions
     Sensor::load();     // load sensor definitions
     Output::load();     // load output definitions
-
+    DIAG(F("Done EEStore::init."));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
