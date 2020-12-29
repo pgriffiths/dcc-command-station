@@ -20,8 +20,8 @@ The configuration file for DCC++ EX Command Station
 //  STANDARD_MOTOR_SHIELD : Arduino Motor shield Rev3 based on the L298 with 18V 2A per channel
 //  POLOLU_MOTOR_SHIELD   : Pololu MC33926 Motor Driver (not recommended for prog track)
 //  FUNDUMOTO_SHIELD      : Fundumoto Shield, no current sensing (not recommended, no short protection)
-//  FIREBOX_MK1           : The Firebox MK1                    
-//  FIREBOX_MK1S          : The Firebox MK1S    
+//  FIREBOX_MK1           : The Firebox MK1
+//  FIREBOX_MK1S          : The Firebox MK1S
 //   |
 //   +-----------------------v
 //
@@ -50,7 +50,7 @@ The configuration file for DCC++ EX Command Station
 //#define DONT_TOUCH_WIFI_CONF
 //
 // WIFI_SSID is the network name IF you want to use your existing home network.
-// Do NOT change this if you want to use the WiFi in Access Point (AP) mode. 
+// Do NOT change this if you want to use the WiFi in Access Point (AP) mode.
 //
 // If you do NOT set the WIFI_SSID, the WiFi chip will first try
 // to connect to the previously configured network and if that fails
@@ -62,7 +62,7 @@ The configuration file for DCC++ EX Command Station
 //
 // WIFI_PASSWORD is the network password for your home network or if
 // you want to change the password from default AP mode password
-// to the AP password you want. 
+// to the AP password you want.
 // Your password may not conain ``"'' (double quote, ASCII 0x22).
 #define WIFI_PASSWORD "unsalted&sharkfree"
 //
@@ -97,7 +97,7 @@ The configuration file for DCC++ EX Command Station
 // Uncomment to use with Ethernet Shields
 //
 // NOTE: This is not used with ESP8266 WiFi modules.
-// 
+//
 // #define MAC_ADDRESS {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEF }
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -112,7 +112,7 @@ The configuration file for DCC++ EX Command Station
 // define LCD_DRIVER for I2C LCD address 0x3f,16 cols, 2 rows
 // #define LCD_DRIVER  0x3F,16,2
 
-//OR define OLED_DRIVER width,height in pixels (address auto detected) 
+//OR define OLED_DRIVER width,height in pixels (address auto detected)
 // This will not work on a UNO due to memory constraints
 // #define OLED_DRIVER 128,32
 

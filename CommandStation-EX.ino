@@ -12,7 +12,7 @@
 #include "config.h"
 #include "DCCEX.h"
 
-// Create a serial command parser for the USB connection, 
+// Create a serial command parser for the USB connection,
 // This supports JMRI or manual diagnostics and commands
 // to be issued from the USB serial console.
 DCCEXParser serialParser;
@@ -24,13 +24,17 @@ void setup()
   // Responsibility 1: Start the usb connection for diagnostics
   // This is normally Serial but uses SerialUSB on a SAMD processor
   Serial.begin(115200);
+  while (!Serial.available())
+    ;
+  delay(500);
+
   DIAG(F("DCC++ EX v%S"),F(VERSION));
-   
+
   CONDITIONAL_LCD_START {
-    // This block is ignored if LCD not in use 
+    // This block is ignored if LCD not in use
     LCD(0,F("DCC++ EX v%S"),F(VERSION));
-    LCD(1,F("Starting")); 
-    }   
+    LCD(1,F("Starting"));
+    }
 
 //  Start the WiFi interface on a MEGA, Uno cannot currently handle WiFi
 
@@ -52,8 +56,9 @@ void setup()
   // Optionally a Timer number (1..4) may be passed to DCC::begin to override the default Timer1 used for the
   // waveform generation.  e.g.  DCC::begin(STANDARD_MOTOR_SHIELD,2); to use timer 2
 
-  DCC::begin(MOTOR_SHIELD_TYPE); 
-  LCD(1,F("Ready")); 
+  DCC::begin(MOTOR_SHIELD_TYPE);
+  LCD(1,F("Ready"));
+  DIAG(F("End DCC::begin -- All ready"));
 }
 
 void loop()
@@ -75,11 +80,11 @@ void loop()
   EthernetInterface::loop();
 #endif
 
-  LCDDisplay::loop();  // ignored if LCD not in use 
-  
+  LCDDisplay::loop();  // ignored if LCD not in use
+
 // Optionally report any decrease in memory (will automatically trigger on first call)
 #if ENABLE_FREE_MEM_WARNING
-  static int ramLowWatermark = 32767; // replaced on first loop 
+  static int ramLowWatermark = 32767; // replaced on first loop
 
   int freeNow = freeMemory();
   if (freeNow < ramLowWatermark)
