@@ -56,16 +56,34 @@ ISR(TIMER2_OVF_vect)
 Timer TimerA((TcCount16*)TC3);
 Timer TimerB((TcCount16*)TC4);
 
-void TC3_Handler() 
+int number_of_tc3_calls = 0;
+int number_of_tc4_calls = 0;
+
+void TC3_Handler()
 {
     TcCount16* TC = (TcCount16*) TC3;
     // If this interrupt is due to the compare register matching the timer count
     // we toggle the LED.
-    if (TC->INTFLAG.bit.MC0 == 1) 
+    if (TC->INTFLAG.bit.MC0 == 1)
     {
         TC->INTFLAG.bit.MC0 = 1;
 
-        // Write callback here!!!
+        number_of_tc3_calls++;
+        TimerA.isrCallback();
+    }
+}
+
+void TC4_Handler()
+{
+    TcCount16* TC = (TcCount16*) TC4;
+    // If this interrupt is due to the compare register matching the timer count
+    // we toggle the LED.
+    if (TC->INTFLAG.bit.MC0 == 1)
+    {
+        TC->INTFLAG.bit.MC0 = 1;
+
+        number_of_tc4_calls++;
+        TimerB.isrCallback();
     }
 }
 

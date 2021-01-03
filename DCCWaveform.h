@@ -1,7 +1,7 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
  *  © 2020, Harald Barth.
- *  
+ *
  *  This file is part of Asbelos DCC API
  *
  *  This is free software: you can redistribute it and/or modify
@@ -56,7 +56,8 @@ class DCCWaveform {
     void setPowerMode(POWERMODE);
     POWERMODE getPowerMode();
     void checkPowerOverload();
-    int  getLastCurrent();
+    int  getLastCurrent() const;
+    int32_t getLastCurrent_mA() const;
     inline int get1024Current() {
 	if (powerMode == POWERMODE::ON)
 	    return (int)(lastCurrent*(long int)1024/motorDriver->getRawCurrentTripValue());
@@ -88,13 +89,13 @@ class DCCWaveform {
     }
 
   private:
-    static VirtualTimer * interruptTimer;      
+    static VirtualTimer * interruptTimer;
     static void interruptHandler();
     bool interrupt1();
     void interrupt2();
     void checkAck();
     void setSignal(bool high);
-    
+
     bool isMainTrack;
     MotorDriver*  motorDriver;
     // Transmission controller
@@ -113,7 +114,7 @@ class DCCWaveform {
     byte pendingRepeats;
     int lastCurrent;
 
-    
+
     // current sampling
     POWERMODE powerMode;
     unsigned long lastSampleTaken;
@@ -124,20 +125,20 @@ class DCCWaveform {
     unsigned long power_sample_overload_wait = POWER_SAMPLE_OVERLOAD_WAIT;
     unsigned int power_good_counter = 0;
 
-    // ACK management (Prog track only)  
+    // ACK management (Prog track only)
     volatile bool ackPending;
     volatile bool ackDetected;
-    int  ackThreshold; 
+    int  ackThreshold;
     int  ackLimitmA = 60;
     int ackMaxCurrent;
     unsigned long ackCheckStart; // millis
-    unsigned int ackCheckDuration; // millis       
-    
+    unsigned int ackCheckDuration; // millis
+
     unsigned int ackPulseDuration;  // micros
     unsigned long ackPulseStart; // micros
 
     unsigned int minAckPulseDuration = 2000; // micros
     unsigned int maxAckPulseDuration = 8500; // micros
-           
+
 };
 #endif

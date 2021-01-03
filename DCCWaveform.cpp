@@ -63,9 +63,14 @@ void DCCWaveform::setDiagnosticSlowWave(bool slow) {
   DIAG(F("\nDCC SLOW WAVE %S\n"),slow?F("SET. DO NOT ADD LOCOS TO TRACK"):F("RESET"));
 }
 
-void DCCWaveform::loop() {
+void DCCWaveform::loop()
+{
   mainTrack.checkPowerOverload();
   progTrack.checkPowerOverload();
+
+  // Display current draw on main line and programming track
+  // LCD(3, F("Main %d mA\n"), mainTrack.getLastCurrent_mA());
+  // LCD(4, F("Prog %d mA\n"), progTrack.getLastCurrent_mA());
 }
 
 
@@ -171,8 +176,10 @@ void DCCWaveform::checkPowerOverload() {
   }
 }
 
-
-
+int32_t DCCWaveform::getLastCurrent_mA() const
+{
+    return motorDriver->raw2mA(this->getLastCurrent());
+}
 
 
 // process time-edge sensitive part of interrupt
@@ -287,7 +294,8 @@ void DCCWaveform::schedulePacket(const byte buffer[], byte byteCount, byte repea
   sentResetsSincePacket=0;
 }
 
-int DCCWaveform::getLastCurrent() {
+int DCCWaveform::getLastCurrent() const
+{
    return lastCurrent;
 }
 

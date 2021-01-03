@@ -2,7 +2,7 @@
 #define RingStream_h
 /*
  *  © 2020, Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of DCC-EX CommandStation-EX
  *
  *  This is free software: you can redistribute it and/or modify
@@ -20,12 +20,13 @@
  */
 
 #include <Arduino.h>
-  
+
 class RingStream : public Print {
 
   public:
-    RingStream( const uint16_t len);
-  
+    RingStream(const uint16_t len = 512);
+    ~RingStream();
+
     virtual size_t write(uint8_t b);
     using Print::write;
     int read();

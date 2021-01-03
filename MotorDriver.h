@@ -1,6 +1,6 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of Asbelos DCC API
  *
  *  This is free software: you can redistribute it and/or modify
@@ -27,6 +27,7 @@
 class MotorDriver {
   public:
     MotorDriver(byte power_pin, byte signal_pin, byte signal_pin2, int8_t brake_pin, byte current_pin, float senseFactor, unsigned int tripMilliamps, byte faultPin);
+    void begin(void);
     virtual void setPower( bool on);
     virtual void setSignal( bool high);
     virtual void setBrake( bool on);

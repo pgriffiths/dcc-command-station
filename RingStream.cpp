@@ -1,6 +1,6 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of DCC-EX CommandStation-EX
  *
  *  This is free software: you can redistribute it and/or modify
@@ -29,7 +29,12 @@ RingStream::RingStream( const uint16_t len)
   _buffer[0]=0;
   _overflow=false;
   _mark=0;
-  _count=0; 
+  _count=0;
+}
+
+RingStream::~RingStream()
+{
+  delete[] _buffer;
 }
 
 size_t RingStream::write(uint8_t b) {
@@ -38,7 +43,7 @@ size_t RingStream::write(uint8_t b) {
   ++_pos_write;
   if (_pos_write==_len) _pos_write=0;
   if (_pos_write==_pos_read) {
-    _overflow=true; 
+    _overflow=true;
     return 0;
   }
   _count++;
@@ -46,7 +51,7 @@ size_t RingStream::write(uint8_t b) {
 }
 
 int RingStream::read() {
-  if ((_pos_read==_pos_write) && !_overflow) return -1;  // empty  
+  if ((_pos_read==_pos_write) && !_overflow) return -1;  // empty
   byte b=_buffer[_pos_read];
   _pos_read++;
   if (_pos_read==_len) _pos_read=0;
@@ -56,13 +61,13 @@ int RingStream::read() {
 
 
 int RingStream::count() {
-  return (read()<<8) | read(); 
+  return (read()<<8) | read();
   }
 
 int RingStream::freeSpace() {
   // allow space for client flag and length bytes
   if (_pos_read>_pos_write) return _pos_read-_pos_write-3;
-  else return _len - _pos_write + _pos_read-3;  
+  else return _len - _pos_write + _pos_read-3;
 }
 
 
@@ -78,13 +83,13 @@ void RingStream::mark(uint8_t b) {
 bool RingStream::commit() {
   if (_overflow) {
         DIAG(F("\nRingStream(%d) commit(%d) OVERFLOW\n"),_len, _count);
-        // just throw it away 
+        // just throw it away
         _pos_write=_mark;
         _overflow=false;
         return false; // commit failed
   }
   if (_count==0) {
-    // ignore empty response 
+    // ignore empty response
     _pos_write=_mark;
     return true; // true=commit ok
   }

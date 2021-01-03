@@ -25,7 +25,7 @@ The configuration file for DCC++ EX Command Station
 //   |
 //   +-----------------------v
 //
-#define MOTOR_SHIELD_TYPE POLOLU_MOTOR_SHIELD
+#define MOTOR_SHIELD_TYPE STANDARD_MOTOR_SHIELD
 
 /////////////////////////////////////////////////////////////////////////////////////
 //
@@ -38,7 +38,7 @@ The configuration file for DCC++ EX Command Station
 // NOTE: Only supported on Arduino Mega
 // Set to false if you not even want it on the Arduino Mega
 //
-#define ENABLE_WIFI true
+#define ENABLE_WIFI false
 
 /////////////////////////////////////////////////////////////////////////////////////
 //
@@ -110,7 +110,7 @@ The configuration file for DCC++ EX Command Station
 // To enable, uncomment one of the lines below
 
 // define LCD_DRIVER for I2C LCD address 0x3f,16 cols, 2 rows
-// #define LCD_DRIVER  0x3F,16,2
+#define LCD_DRIVER  0x27,20,4
 
 //OR define OLED_DRIVER width,height in pixels (address auto detected)
 // This will not work on a UNO due to memory constraints

@@ -1,7 +1,7 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
  *  © 2020, Harald Barth.
- *  
+ *
  *  This file is part of CommandStation-EX
  *
  *  This is free software: you can redistribute it and/or modify
@@ -48,7 +48,7 @@ const int HASH_KEYWORD_SLOW = -17209;
 const int HASH_KEYWORD_PROGBOOST = -6353;
 const int HASH_KEYWORD_EEPROM = -7168;
 const int HASH_KEYWORD_LIMIT = 27413;
-const int HASH_KEYWORD_ETHERNET = -30767;    
+const int HASH_KEYWORD_ETHERNET = -30767;
 const int HASH_KEYWORD_MAX = 16244;
 const int HASH_KEYWORD_MIN = 15978;
 
@@ -166,7 +166,7 @@ int DCCEXParser::splitHexValues(int result[MAX_PARAMS], const byte *cmd)
     byte parameterCount = 0;
     int runningValue = 0;
     const byte *remainingCmd = cmd + 1; // skips the opcode
-    
+
     // clear all parameters in case not enough found
     for (int i = 0; i < MAX_PARAMS; i++)
         result[i] = 0;
@@ -207,7 +207,7 @@ int DCCEXParser::splitHexValues(int result[MAX_PARAMS], const byte *cmd)
                 runningValue = 16 * runningValue + 10 + (hot - 'a');
                 break;
             }
-            if (hot==' ' || hot=='>' || hot=='\0') { 
+            if (hot==' ' || hot=='>' || hot=='\0') {
                result[parameterCount] = runningValue;
                parameterCount++;
                state = 1;
@@ -332,17 +332,17 @@ void DCCEXParser::parse(Print *stream, byte *com, bool blocking)
     case 'P': // WRITE TRANSPARENT DCC PACKET PROG <P REG X1 ... X9>
         // Re-parse the command using a hex-only splitter
         params=splitHexValues(p,com)-1; // drop REG
-        if (params<1) break;  
+        if (params<1) break;
         {
           byte packet[params];
           for (int i=0;i<params;i++) {
             packet[i]=(byte)p[i+1];
             if (Diag::CMD) DIAG(F("packet[%d]=%d (0x%x)\n"), i, packet[i], packet[i]);
           }
-          (opcode=='M'?DCCWaveform::mainTrack:DCCWaveform::progTrack).schedulePacket(packet,params,3);  
+          (opcode=='M'?DCCWaveform::mainTrack:DCCWaveform::progTrack).schedulePacket(packet,params,3);
         }
         return;
-        
+
     case 'W': // WRITE CV ON PROG <W CV VALUE CALLBACKNUM CALLBACKSUB>
         if (!stashCallback(stream, p))
             break;
@@ -504,7 +504,7 @@ bool DCCEXParser::parseZ(Print *stream, int params, int p[])
 
     switch (params)
     {
-    
+
     case 2: // <Z ID ACTIVATE>
     {
         Output *o = Output::get(p[0]);
@@ -552,7 +552,7 @@ bool DCCEXParser::parsef(Print *stream, int params, int p[])
         byte instructionField = p[1] & 0xE0;   // 1110 0000
         if (instructionField == 0x80)          // 1000 0000 Function group 1
         {
-	    // Shuffle bits from order F0 F4 F3 F2 F1 to F4 F3 F2 F1 F0 
+	    // Shuffle bits from order F0 F4 F3 F2 F1 to F4 F3 F2 F1 F0
             byte normalized = (p[1] << 1 & 0x1e) | (p[1] >> 4 & 0x01);
             funcmap(p[0], normalized, 0, 4);
         }

@@ -1,6 +1,6 @@
 /*
  *  © 2020,Gregor Baues,  Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of CommandStation-EX
  *
  *  This is free software: you can redistribute it and/or modify
@@ -20,12 +20,24 @@
 #include "CommandDistributor.h"
 #include "WiThrottle.h"
 
-DCCEXParser * CommandDistributor::parser=0; 
+// Initialize DCC++ parser to null
+DCCEXParser* CommandDistributor::parser = nullptr;
 
-void  CommandDistributor::parse(byte clientId,byte * buffer, RingStream * streamer) {
- if (buffer[0] == '<')  {
-    if (!parser) parser = new DCCEXParser();
+void  CommandDistributor::parse(byte clientId,byte * buffer, RingStream * streamer)
+{
+  // Auto-detect DCC++ commands
+  if (buffer[0] == '<')
+  {
+    // If there parser has not been created, allocate once
+    if (!parser)
+    {
+      parser = new DCCEXParser();
+    }
     parser->parse(streamer, buffer, true); // tell JMRI parser that ACKS are blocking because we can't handle the async
   }
-  else WiThrottle::getThrottle(clientId)->parse(streamer, buffer);
+  else
+  {
+    // WiThrottle protocol commands start with a character
+    WiThrottle::getThrottle(clientId)->parse(streamer, buffer);
+  }
 }
