@@ -7,3 +7,4 @@ Release/*
 .pio/
 .vscode/
 .build/
+*secrets*

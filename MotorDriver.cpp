@@ -1,6 +1,6 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of Asbelos DCC API
  *
  *  This is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@
     #define WritePin digitalWrite2
     #define ReadPin digitalRead2
 #endif
-    
+
 MotorDriver::MotorDriver(byte power_pin, byte signal_pin, byte signal_pin2, int8_t brake_pin,
                          byte current_pin, float sense_factor, unsigned int trip_milliamps, byte fault_pin) {
   powerPin=power_pin;
@@ -45,13 +45,41 @@ MotorDriver::MotorDriver(byte power_pin, byte signal_pin, byte signal_pin2, int8
   faultPin=fault_pin;
   tripMilliamps=trip_milliamps;
   rawCurrentTripValue=(int)(trip_milliamps / sense_factor);
+}
+
+void MotorDriver::begin()
+{
+  // Power pin
   pinMode(powerPin, OUTPUT);
-  pinMode(brakePin < 0 ? -brakePin : brakePin, OUTPUT);
+
+  // Brake pin
+  if(brakePin != UNUSED_PIN)
+  {
+    pinMode(brakePin < 0 ? -brakePin : brakePin, OUTPUT);
+  }
+
+  // Set brake mode
   setBrake(false);
-  pinMode(signalPin, OUTPUT);
-  if (signalPin2 != UNUSED_PIN) pinMode(signalPin2, OUTPUT);
-  pinMode(currentPin, INPUT);
-  if (faultPin != UNUSED_PIN) pinMode(faultPin, INPUT);
+
+  if(signalPin != UNUSED_PIN)
+  {
+    pinMode(signalPin, OUTPUT);
+  }
+
+  if(signalPin2 != UNUSED_PIN)
+  {
+    pinMode(signalPin2, OUTPUT);
+  }
+
+  if(currentPin != UNUSED_PIN)
+  {
+    pinMode(currentPin, INPUT);
+  }
+
+  if (faultPin != UNUSED_PIN)
+  {
+    pinMode(faultPin, INPUT);
+  }
 }
 
 void MotorDriver::setPower(bool on) {
@@ -72,9 +100,18 @@ void MotorDriver::setPower(bool on) {
 // (HIGH == release brake) and setBrake does
 // compensate for that.
 //
-void MotorDriver::setBrake(bool on) {
+void MotorDriver::setBrake(bool on)
+{
+    // Early exit if the brake pin is unset
+    if(brakePin == UNUSED_PIN)
+    {
+      return;
+    }
+
     bool state = on;
     byte pin = brakePin;
+
+    // Negative denotes flipped sense, i.e "on" is digital LOW
     if (brakePin < 0) {
       pin=-pin;
       state=!state;
@@ -83,19 +120,27 @@ void MotorDriver::setBrake(bool on) {
     //DIAG(F("BrakePin: %d is %d\n"), pin, ReadPin(pin));
 }
 
-void MotorDriver::setSignal( bool high) {
-  WritePin(signalPin, high ? HIGH : LOW);
-  if (signalPin2 != UNUSED_PIN) WritePin(signalPin2, high ? LOW : HIGH);
+void MotorDriver::setSignal( bool high)
+{
+  if(signalPin != UNUSED_PIN)
+  {
+    WritePin(signalPin, high ? HIGH : LOW);
+  }
+
+  if (signalPin2 != UNUSED_PIN)
+  {
+    WritePin(signalPin2, high ? LOW : HIGH);
+  }
 }
 
 
 int MotorDriver::getCurrentRaw() {
   if (faultPin != UNUSED_PIN && ReadPin(faultPin) == LOW && ReadPin(powerPin) == HIGH)
       return (int)(32000/senseFactor);
-  
+
   // IMPORTANT:  This function can be called in Interrupt() time within the 56uS timer
   //             The default analogRead takes ~100uS which is catastrphic
-  //             so analogReadFast is used here. (-2uS) 
+  //             so analogReadFast is used here. (-2uS)
   return analogReadFast(currentPin);
 }
 

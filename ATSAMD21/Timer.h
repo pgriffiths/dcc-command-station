@@ -7,7 +7,7 @@
 #define CPU_HZ 48000000
 #define TIMER_PRESCALER_DIV 1
 
-class Timer : public VirtualTimer 
+class Timer : public VirtualTimer
 {
 private:
     TcCount16* _TC = nullptr;
@@ -44,7 +44,7 @@ public:
         _TC->CTRLA.reg |= TC_CTRLA_WAVEGEN_MFRQ;
         while (_TC->STATUS.bit.SYNCBUSY == 1); // wait for sync
 
-        // Set prescaler to 1 
+        // Set prescaler to 1
         // For a 48MHz clock and 16 counter, maximum duration ~1.3 ms
         _TC->CTRLA.reg |= TC_CTRLA_PRESCALER_DIV1;
         while (_TC->STATUS.bit.SYNCBUSY == 1); // wait for sync
@@ -60,14 +60,14 @@ public:
         // Save the setting
         _lastMicroseconds = microseconds;
 
-        // 
+        //
         int compareValue = (CPU_HZ / TIMER_PRESCALER_DIV / 1000000) * microseconds - 1;
 
         // Make sure the count is in a proportional position to where it was
         // to prevent any jitter or disconnect when changing the compare value.
         _TC->COUNT.reg = map(_TC->COUNT.reg, 0, _TC->CC[0].reg, 0, compareValue);
         _TC->CC[0].reg = compareValue;
-        while (_TC->STATUS.bit.SYNCBUSY == 1);     // wait for sync    
+        while (_TC->STATUS.bit.SYNCBUSY == 1);     // wait for sync
     }
 
     void start()
@@ -90,16 +90,20 @@ public:
     void attachInterrupt(void (*isr)())
     {
         isrCallback = isr;
-	    
+
     }
-    
+
     void detachInterrupt()
     {
-       
+
     }
 };
 
 extern Timer TimerA;
 extern Timer TimerB;
+
+// Counters to monitor number of ISR calls
+extern int number_of_tc3_calls;
+extern int number_of_tc4_calls;
 
 #endif

@@ -1,6 +1,6 @@
 /*
  *  © 2020, Chris Harlow. All rights reserved.
- *  
+ *
  *  This file is part of Asbelos DCC API
  *
  *  This is free software: you can redistribute it and/or modify
@@ -32,30 +32,30 @@ struct DCCEXParser
    static void setFilter(FILTER_CALLBACK filter);
    static void setAtCommandCallback(AT_COMMAND_CALLBACK filter);
    static const int MAX_PARAMS=10;  // Must not exceed this
- 
+
    private:
-  
+
     static const int MAX_BUFFER=50;  // longest command sent in
      byte  bufferLength=0;
      bool  inCommandPayload=false;
-     byte  buffer[MAX_BUFFER+2]; 
+     byte  buffer[MAX_BUFFER+2];
     int splitValues( int result[MAX_PARAMS], const byte * command);
     int splitHexValues( int result[MAX_PARAMS], const byte * command);
-     
+
      bool parseT(Print * stream, int params, int p[]);
      bool parseZ(Print * stream, int params, int p[]);
      bool parseS(Print * stream,  int params, int p[]);
      bool parsef(Print * stream,  int params, int p[]);
      bool parseD(Print * stream,  int params, int p[]);
 
-    
+
     static bool stashBusy;
-   
+
     static Print * stashStream;
     static int stashP[MAX_PARAMS];
     bool stashCallback(Print * stream, int p[MAX_PARAMS]);
     static void callback_W(int result);
-    static void callback_B(int result);        
+    static void callback_B(int result);
     static void callback_R(int result);
     static void callback_Rloco(int result);
     static void callback_Vbit(int result);
