@@ -1,5 +1,6 @@
 #include "wifi101_adapter.h"
 #include "CommandDistributor.h"
+//#include "Arduino_CRC32.h"
 
 FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port)
 {
@@ -62,7 +63,7 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
     return;
   }
 
-  // Null terminate and send along to the command distrubtor
+  // Null terminate and send along to the command distributor
   wb->inboundLine[wb->inboundCnt++] = '\0';
   Serial.println(F("cmd:"));
   Serial.print(wb->inboundLine);
