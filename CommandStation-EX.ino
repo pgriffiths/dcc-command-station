@@ -11,6 +11,8 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <WiFi101.h>
+#include <periodic_trigger.h>
+#include <smooth_on_off.h>
 
 #include "config.h"
 #include "DCCEX.h"
@@ -32,6 +34,16 @@ WiThrottleSessions withrottle_sessions;
 // to be issued from the USB serial console.
 DCCEXParser serialParser;
 
+constexpr int CATSEYE_PRESS_PIN = 13;
+constexpr int CATSEYE_BLUE_PIN = 5;
+constexpr int CATSEYE_RED_PIN = 6;
+constexpr int FLASH_MS = 1200;
+constexpr int TRANSITION_MS = 400;
+
+SmoothOnOff catseye_red(CATSEYE_BLUE_PIN, TRANSITION_MS);
+SmoothOnOff catseye_blue(CATSEYE_RED_PIN, TRANSITION_MS);
+PeriodicTrigger quick_timer(FLASH_MS);
+PeriodicTrigger slow_timer(5*FLASH_MS);
 
 void printWiFiStatus()
 {
@@ -151,10 +163,25 @@ void setup()
   printFreeMem();
   Serial.println(F("Startup Complete"));
   LCD(1,F("Ready"));
+
+  catseye_red.begin();
+  catseye_blue.begin();
+  quick_timer.begin();
+  slow_timer.begin();
+
+  catseye_blue.flipPolarity();
+  catseye_red.flipPolarity();
+
+  catseye_red.turnOff();
+  catseye_blue.turnOff();
+
+  pinMode(CATSEYE_PRESS_PIN, INPUT);
 }
 
 void loop()
 {
+  static int last_press_state = 0;
+
   // The main sketch has responsibilities during loop()
 
   // Responsibility 1: Handle DCC background processes
@@ -175,6 +202,25 @@ void loop()
   LCDDisplay::loop();  // ignored if LCD not in use
 
   portParserLoop(server, &withrottle_sessions);
+
+  // if(quick_timer.loop())
+  // {
+  //   catseye_blue.toggleOnOff();
+  // }
+
+  if(slow_timer.loop())
+  {
+    catseye_red.toggleOnOff();
+  }
+
+  int new_press_state = digitalRead(CATSEYE_PRESS_PIN);
+  if(last_press_state != new_press_state)
+  {
+      catseye_blue.toggleOnOff();
+  }
+  last_press_state = new_press_state;
+  catseye_red.loop();
+  catseye_blue.loop();
 
 // Optionally report any decrease in memory (will automatically trigger on first call)
 #if ENABLE_FREE_MEM_WARNING
