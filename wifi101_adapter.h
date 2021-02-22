@@ -29,5 +29,6 @@ typedef struct
 FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port);
 void portParserOneLine(WiThrottleBuffers* wb, Stream& out);
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w);
+void BeginWifi101Adapter(void);
 
 #endif
