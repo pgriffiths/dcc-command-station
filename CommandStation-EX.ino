@@ -156,6 +156,8 @@ void setup()
   setupWifi();
 
   // start the server:
+  BeginWifi101Adapter();
+
   server = new WiFiServer(80);
   server->begin();
   Serial.println(F("wifi Server started"));

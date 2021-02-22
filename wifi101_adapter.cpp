@@ -1,6 +1,21 @@
 #include "wifi101_adapter.h"
 #include "CommandDistributor.h"
-//#include "Arduino_CRC32.h"
+
+typedef struct
+{
+  WiFiClient client;
+  unsigned long last_active_ms;
+} WifiClientTimeout;
+
+WifiClientTimeout client_timeout[TCP_SOCK_MAX] = {};
+
+void BeginWifi101Adapter(void)
+{
+  for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
+  {
+    client_timeout[idx].client = WiFiClient();
+  }
+}
 
 FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port)
 {
@@ -104,12 +119,59 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
   // Return any client with input avaiable
   WiFiClient client = s->available();
 
+  // Track active clients
+  signed long current_time_ms = millis();
+
+  if(client)
+  {
+    bool marked = false;
+    for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
+    {
+      if(client_timeout[idx].client == client)
+      {
+        // Mark activity
+        client_timeout[idx].last_active_ms = current_time_ms;
+        marked = true;
+        break;
+      }
+    }
+
+    if(!marked) // not currently tracked, add to tracking
+    {
+      for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
+      {
+        // Take first unused client
+        if(!client_timeout[idx].client)
+        {
+          client_timeout[idx].client = client;
+          client_timeout[idx].last_active_ms = current_time_ms;
+          marked = true;
+        }
+      }
+      // !marked should be impossible given TCP_SOCK_MAX
+    }
+  }
+
+  // Close clients after a timeout
+  for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
+  {
+    signed long duration_ms = current_time_ms - client_timeout[idx].last_active_ms;
+
+    if(duration_ms > 10000)
+    {
+      client_timeout[idx].client.stop();
+      client_timeout[idx].client = WiFiClient();
+    }
+  }
+
+
   // client will be "false" if none of the clients have data
   if (!client)
   {
     // early exit if nothing to do
     return;
   }
+
 
   // Have a client with data on a remote port
   int32_t remote_port = (int32_t)client.remotePort();
