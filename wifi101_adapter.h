@@ -3,6 +3,7 @@
 
 #include <WiFi101.h>
 #include "RingStream.h"
+#include "WiThrottle.h"
 
 constexpr size_t INBOUND_LINE_MAX = 512;
 typedef struct
@@ -11,6 +12,9 @@ typedef struct
     char inboundLine[INBOUND_LINE_MAX];
     int32_t inboundCnt;
     RingStream outboundRing;
+
+    WiFiClient client;
+    unsigned long last_active_ms;
 } WiThrottleBuffers;
 
 constexpr size_t WITHROTTLE_SESSION_MAX = 8;
@@ -26,9 +30,8 @@ typedef struct
   WiThrottleBuffers* wb;
 } FindPortResult;
 
-FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port);
+FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client);
 void portParserOneLine(WiThrottleBuffers* wb, Stream& out);
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w);
-void BeginWifi101Adapter(void);
 
 #endif
