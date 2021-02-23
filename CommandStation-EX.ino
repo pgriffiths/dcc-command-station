@@ -16,6 +16,7 @@
 
 #include "config.h"
 #include "DCCEX.h"
+#include "DCCWaveform.h"
 #include "wifi101_adapter.h"
 #include "arduino_secrets.h"
 
@@ -27,7 +28,7 @@ char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as k
 // IPAddress dcc_ip(192, 168, 0, 12);
 WiFiServer *server;
 
-WiThrottleSessions withrottle_sessions;
+WiThrottleSessions withrottle_sessions = {};
 
 // Create a serial command parser for the USB connection,
 // This supports JMRI or manual diagnostics and commands
@@ -156,8 +157,6 @@ void setup()
   setupWifi();
 
   // start the server:
-  BeginWifi101Adapter();
-
   server = new WiFiServer(80);
   server->begin();
   Serial.println(F("wifi Server started"));
@@ -170,9 +169,6 @@ void setup()
   catseye_blue.begin();
   quick_timer.begin();
   slow_timer.begin();
-
-  catseye_blue.flipPolarity();
-  catseye_red.flipPolarity();
 
   catseye_red.turnOff();
   catseye_blue.turnOff();
@@ -205,22 +201,37 @@ void loop()
 
   portParserLoop(server, &withrottle_sessions);
 
-  // if(quick_timer.loop())
-  // {
-  //   catseye_blue.toggleOnOff();
-  // }
-
-  if(slow_timer.loop())
-  {
-    catseye_red.toggleOnOff();
-  }
 
   int new_press_state = digitalRead(CATSEYE_PRESS_PIN);
-  if(last_press_state != new_press_state)
+  auto mode = DCCWaveform::mainTrack.getPowerMode();
+
+  // If transitioning to pressed, toggle power
+  if(new_press_state && new_press_state != last_press_state)
   {
-      catseye_blue.toggleOnOff();
+    mode = (mode == POWERMODE::ON ? POWERMODE::OFF : POWERMODE::ON);
+    DCCWaveform::mainTrack.setPowerMode(mode);
   }
   last_press_state = new_press_state;
+
+  // Make color reflect power
+  switch(mode)
+  {
+    case POWERMODE::OFF:
+      catseye_red.fullOn();
+      catseye_blue.fullOff();
+      break;
+
+    case POWERMODE::ON:
+      catseye_red.fullOff();
+      catseye_blue.fullOn();
+      break;
+
+    case POWERMODE::OVERLOAD:
+      catseye_red.fullOff();
+      catseye_blue.fullOff();
+      break;
+
+  }
   catseye_red.loop();
   catseye_blue.loop();
 

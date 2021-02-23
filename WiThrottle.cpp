@@ -67,6 +67,24 @@ WiThrottle* WiThrottle::getThrottle( int wifiClient)
   return new WiThrottle( wifiClient);
 }
 
+void WiThrottle::dropThrottle(int wifiClient)
+{
+  WiThrottle* wt;
+
+  for (wt=firstThrottle; wt!=NULL ; wt=wt->nextThrottle)
+  {
+     if (wt->clientid==wifiClient)
+     {
+        break;
+     }
+  }
+
+  if(wt!=NULL)
+  {
+    delete wt;
+  }
+}
+
 bool WiThrottle::isThrottleInUse(int cab)
 {
   for (WiThrottle* wt=firstThrottle; wt!=NULL ; wt=wt->nextThrottle)

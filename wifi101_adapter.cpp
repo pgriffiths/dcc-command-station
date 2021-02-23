@@ -1,28 +1,13 @@
 #include "wifi101_adapter.h"
 #include "CommandDistributor.h"
 
-typedef struct
-{
-  WiFiClient client;
-  unsigned long last_active_ms;
-} WifiClientTimeout;
-
-WifiClientTimeout client_timeout[TCP_SOCK_MAX] = {};
-
-void BeginWifi101Adapter(void)
-{
-  for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
-  {
-    client_timeout[idx].client = WiFiClient();
-  }
-}
-
-FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port)
+FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client)
 {
   // Is this a client we have seen before?
   bool new_session = true;
   bool found = false;
   size_t idx;
+  int32_t remote_port = client.remotePort();
 
   // First look for remote_port
   for(idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
@@ -57,9 +42,19 @@ FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port)
     Serial.print(F("New client on port: "));
     Serial.println(remote_port);
 
+    Serial.print(F("idx: "));
+    Serial.println(idx);
+
     // session is in use now!
     wb->remotePort = remote_port;
     wb->inboundCnt = 0;
+
+    // ensure ring buffer is clear
+    while(wb->outboundRing.read() >= 0)
+    {}
+
+    wb->client = client;
+    wb->last_active_ms = millis();
   }
 
   // whether new or not, the session is at index idx.
@@ -68,6 +63,29 @@ FindPortResult findRemotePort(WiThrottleSessions* w, int32_t remote_port)
     .found = (idx != WITHROTTLE_SESSION_MAX),
     .wb = &w->withrottle_buffers[idx]
   };
+}
+
+void closeWiFiClientsOnTimeout(WiThrottleSessions* w)
+{
+  uint32_t current_time_ms = millis();
+  constexpr uint32_t TIMEOUT_MS = 15000;
+
+  // First look for remote_port
+  for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
+  {
+    WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
+
+    if(wb->remotePort != 0 && current_time_ms - wb->last_active_ms > TIMEOUT_MS)
+    {
+      Serial.print(F("Timeout on port: "));
+      Serial.println(wb->remotePort);
+
+      // Close the connection, drop the throttle
+      WiThrottle::dropThrottle(wb->remotePort);
+      wb->client.stop();
+      wb->remotePort = 0;
+    }
+  }
 }
 
 void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
@@ -112,58 +130,17 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
     }
     wb->outboundRing.flush();
   }
+
+  // mark the time to keep the throttle and connection open
+  wb->last_active_ms = millis();
 }
 
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
 {
+  closeWiFiClientsOnTimeout(w);
+
   // Return any client with input avaiable
   WiFiClient client = s->available();
-
-  // Track active clients
-  signed long current_time_ms = millis();
-
-  if(client)
-  {
-    bool marked = false;
-    for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
-    {
-      if(client_timeout[idx].client == client)
-      {
-        // Mark activity
-        client_timeout[idx].last_active_ms = current_time_ms;
-        marked = true;
-        break;
-      }
-    }
-
-    if(!marked) // not currently tracked, add to tracking
-    {
-      for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
-      {
-        // Take first unused client
-        if(!client_timeout[idx].client)
-        {
-          client_timeout[idx].client = client;
-          client_timeout[idx].last_active_ms = current_time_ms;
-          marked = true;
-        }
-      }
-      // !marked should be impossible given TCP_SOCK_MAX
-    }
-  }
-
-  // Close clients after a timeout
-  for(size_t idx = 0; idx < TCP_SOCK_MAX; ++idx)
-  {
-    signed long duration_ms = current_time_ms - client_timeout[idx].last_active_ms;
-
-    if(duration_ms > 10000)
-    {
-      client_timeout[idx].client.stop();
-      client_timeout[idx].client = WiFiClient();
-    }
-  }
-
 
   // client will be "false" if none of the clients have data
   if (!client)
@@ -172,11 +149,8 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
     return;
   }
 
-
-  // Have a client with data on a remote port
-  int32_t remote_port = (int32_t)client.remotePort();
-  // Determine if
-  auto it = findRemotePort(w, remote_port);
+  // Find or establish a throttle for the client
+  auto it = findThrottleAdapter(w, client);
 
   if(!it.found)
   {
