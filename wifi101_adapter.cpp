@@ -65,17 +65,16 @@ FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client)
   };
 }
 
-void closeWiFiClientsOnTimeout(WiThrottleSessions* w)
+void closeWiFiClientsOnTimeout(WiThrottleSessions* w, uint32_t timeout_ms)
 {
   uint32_t current_time_ms = millis();
-  constexpr uint32_t TIMEOUT_MS = 15000;
 
   // First look for remote_port
   for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
   {
     WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
 
-    if(wb->remotePort != 0 && current_time_ms - wb->last_active_ms > TIMEOUT_MS)
+    if(wb->remotePort != 0 && current_time_ms - wb->last_active_ms >= timeout_ms)
     {
       Serial.print(F("Timeout on port: "));
       Serial.println(wb->remotePort);
@@ -137,7 +136,9 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
 
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
 {
-  closeWiFiClientsOnTimeout(w);
+  constexpr uint32_t TIMEOUT_MS = 15000;
+
+  closeWiFiClientsOnTimeout(w, TIMEOUT_MS);
 
   // Return any client with input avaiable
   WiFiClient client = s->available();
@@ -154,7 +155,10 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
 
   if(!it.found)
   {
-    Serial.println(F("No session available"));
+    Serial.println(F("No session available. Closing everything!"));
+    // Freak out and close ALL connections
+    // Gives us a chance to recover resources
+    closeWiFiClientsOnTimeout(w, 0);
     client.stop();
     return;
   }
