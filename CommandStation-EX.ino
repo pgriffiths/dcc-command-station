@@ -13,6 +13,7 @@
 #include <WiFi101.h>
 #include <periodic_trigger.h>
 #include <smooth_on_off.h>
+#include "debounce.h"
 
 #include "config.h"
 #include "DCCEX.h"
@@ -40,9 +41,12 @@ constexpr int CATSEYE_BLUE_PIN = 5;
 constexpr int CATSEYE_RED_PIN = 6;
 constexpr int FLASH_MS = 1200;
 constexpr int TRANSITION_MS = 400;
+constexpr uint32_t BUTTON_DEBOUNCE_MS = 50;
 
 SmoothOnOff catseye_red(CATSEYE_BLUE_PIN, TRANSITION_MS);
 SmoothOnOff catseye_blue(CATSEYE_RED_PIN, TRANSITION_MS);
+DebounceOnOff push_button_debounce(BUTTON_DEBOUNCE_MS);
+
 PeriodicTrigger quick_timer(FLASH_MS);
 PeriodicTrigger slow_timer(5*FLASH_MS);
 
@@ -174,12 +178,11 @@ void setup()
   catseye_blue.turnOff();
 
   pinMode(CATSEYE_PRESS_PIN, INPUT);
+  push_button_debounce.begin();
 }
 
 void loop()
 {
-  static int last_press_state = 0;
-
   // The main sketch has responsibilities during loop()
 
   // Responsibility 1: Handle DCC background processes
@@ -201,17 +204,17 @@ void loop()
 
   portParserLoop(server, &withrottle_sessions);
 
-
-  int new_press_state = digitalRead(CATSEYE_PRESS_PIN);
+  // Read and debounce button push -- pin reads 1 when pressed
+  auto button_push = push_button_debounce.loop(digitalRead(CATSEYE_PRESS_PIN) == HIGH);
   auto mode = DCCWaveform::mainTrack.getPowerMode();
 
   // If transitioning to pressed, toggle power
-  if(new_press_state && new_press_state != last_press_state)
+  if(button_push == DebounceOnOff::On)
   {
+    // invert power mode on each button push
     mode = (mode == POWERMODE::ON ? POWERMODE::OFF : POWERMODE::ON);
     DCCWaveform::mainTrack.setPowerMode(mode);
   }
-  last_press_state = new_press_state;
 
   // Make color reflect power
   switch(mode)
@@ -234,6 +237,12 @@ void loop()
   }
   catseye_red.loop();
   catseye_blue.loop();
+
+  // reconnect on disconnet
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    setupWifi();
+  }
 
 // Optionally report any decrease in memory (will automatically trigger on first call)
 #if ENABLE_FREE_MEM_WARNING
