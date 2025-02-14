@@ -33,5 +33,6 @@ typedef struct
 FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client);
 void portParserOneLine(WiThrottleBuffers* wb, Stream& out);
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w);
+size_t openWiFiClients(WiThrottleSessions* w);
 
 #endif

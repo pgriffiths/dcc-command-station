@@ -67,10 +67,6 @@ void DCCWaveform::loop()
 {
   mainTrack.checkPowerOverload();
   progTrack.checkPowerOverload();
-
-  // Display current draw on main line and programming track
-  // LCD(3, F("Main %d mA\n"), mainTrack.getLastCurrent_mA());
-  // LCD(4, F("Prog %d mA\n"), progTrack.getLastCurrent_mA());
 }
 
 

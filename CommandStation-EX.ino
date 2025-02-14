@@ -11,6 +11,9 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <WiFi101.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
 #include <periodic_trigger.h>
 #include <smooth_on_off.h>
 #include "debounce.h"
@@ -43,12 +46,15 @@ constexpr int FLASH_MS = 1200;
 constexpr int TRANSITION_MS = 400;
 constexpr uint32_t BUTTON_DEBOUNCE_MS = 50;
 
-SmoothOnOff catseye_red(CATSEYE_BLUE_PIN, TRANSITION_MS);
-SmoothOnOff catseye_blue(CATSEYE_RED_PIN, TRANSITION_MS);
+SmoothOnOff catseye_red(CATSEYE_RED_PIN, TRANSITION_MS);
+SmoothOnOff catseye_blue(CATSEYE_BLUE_PIN, TRANSITION_MS);
 DebounceOnOff push_button_debounce(BUTTON_DEBOUNCE_MS);
 
 PeriodicTrigger quick_timer(FLASH_MS);
 PeriodicTrigger slow_timer(5*FLASH_MS);
+
+// i2c LCD disaplay with 20 cols, 4 rows
+LiquidCrystal_I2C lcd(0x27,20,4);
 
 void printWiFiStatus()
 {
@@ -108,22 +114,29 @@ void printFreeMem()
   Serial.println(freeMemory());
 }
 
-MotorDriver main_track = MotorDriver(16, 11, UNUSED_PIN, UNUSED_PIN, A0, 2.99, 2000, UNUSED_PIN);
-MotorDriver prog_track = MotorDriver(17, 12, UNUSED_PIN, UNUSED_PIN, A1, 2.99, 2000, UNUSED_PIN);
+MotorDriver main_track = MotorDriver(16, 11, UNUSED_PIN, UNUSED_PIN, A0, 2.99, 2500, UNUSED_PIN);
+MotorDriver prog_track = MotorDriver(17, 12, UNUSED_PIN, UNUSED_PIN, A1, 2.99, 750, UNUSED_PIN);
 
 void setup()
 {
+  lcd.init();                      // initialize the lcd
+  lcd.clear();
+  lcd.backlight();
+
+  lcd.setCursor(0,0); lcd.print("DCC Init...");
+
   for(size_t idx=0; idx < WITHROTTLE_SESSION_MAX; idx++)
   {
     withrottle_sessions.withrottle_buffers[idx].remotePort = 0;
   }
+
+  pinMode(CATSEYE_PRESS_PIN, INPUT);
 
   // Responsibility 1: Start the usb connection for diagnostics
   // This is normally Serial but uses SerialUSB on a SAMD processor
   Serial.begin(115200);
   // while (!Serial.available())
   //   ;
-  delay(500);
 
   DIAG(F("DCC++ EX v%S"),F(VERSION));
 
@@ -154,20 +167,26 @@ void setup()
     F("STANDARD_MOTOR_SHIELD"),
     &main_track, &prog_track);
 
-
   Serial.println(F("End DCC::begin -- All ready"));
+  lcd.print("Done!");
+
+
   // Configure and connect to Wifi
   LCD(1,F("Connecting wifi..."));
+  lcd.setCursor(0,1); lcd.print("Connect wifi...");
   setupWifi();
 
   // start the server:
   server = new WiFiServer(80);
   server->begin();
   Serial.println(F("wifi Server started"));
+  lcd.print("Done!");
 
-  printFreeMem();
   Serial.println(F("Startup Complete"));
   LCD(1,F("Ready"));
+
+  catseye_red.setOnOffLevels(64,0);
+  catseye_blue.setOnOffLevels(64,0);
 
   catseye_red.begin();
   catseye_blue.begin();
@@ -181,8 +200,20 @@ void setup()
   push_button_debounce.begin();
 }
 
+const char power_status [][4] = {
+    "OFF",
+    " ON",
+    "OL!"
+};
+
 void loop()
 {
+  static int loop_cnt = 0;
+  static bool asleep = false;
+  static int last_active_ms = millis();
+
+  loop_cnt++;
+
   // The main sketch has responsibilities during loop()
 
   // Responsibility 1: Handle DCC background processes
@@ -211,27 +242,43 @@ void loop()
   // If transitioning to pressed, toggle power
   if(button_push == DebounceOnOff::On)
   {
-    // invert power mode on each button push
-    mode = (mode == POWERMODE::ON ? POWERMODE::OFF : POWERMODE::ON);
-    DCCWaveform::mainTrack.setPowerMode(mode);
+    if(asleep)
+    {
+      // just wake up
+      asleep = false;
+      lcd.backlight();
+      catseye_red.setOnOffLevels(64,0);
+      last_active_ms = millis();
+    }
+    else
+    {
+      // invert power mode on each button push
+      mode = (mode == POWERMODE::ON ? POWERMODE::OFF : POWERMODE::ON);
+      DCCWaveform::mainTrack.setPowerMode(mode);
+    }
   }
 
   // Make color reflect power
+  const char *status = power_status[0];
+
   switch(mode)
   {
     case POWERMODE::OFF:
       catseye_red.fullOn();
       catseye_blue.fullOff();
+      status = power_status[0];
       break;
 
     case POWERMODE::ON:
       catseye_red.fullOff();
       catseye_blue.fullOn();
+      status = power_status[1];
       break;
 
     case POWERMODE::OVERLOAD:
       catseye_red.fullOff();
       catseye_blue.fullOff();
+      status = power_status[2];
       break;
 
   }
@@ -244,15 +291,61 @@ void loop()
     setupWifi();
   }
 
-// Optionally report any decrease in memory (will automatically trigger on first call)
-#if ENABLE_FREE_MEM_WARNING
-  static int ramLowWatermark = 32767; // replaced on first loop
+  // Check number of connected clients
+  size_t num_clients = openWiFiClients(&withrottle_sessions);
 
-  int freeNow = freeMemory();
-  if (freeNow < ramLowWatermark)
+  // Handle sleep/wake
+  if(num_clients > 0 || mode !=  POWERMODE::OFF)
   {
-    ramLowWatermark = freeNow;
-    LCD(2,F("Free RAM=%5db"), ramLowWatermark);
+      // Current activity
+      last_active_ms = millis();
+
+      // If was asleep, restore brightness
+      if(asleep)
+      {
+        asleep = false;
+        lcd.backlight();
+        catseye_red.setOnOffLevels(64,0);
+      }
   }
-#endif
+
+  // Sleep condition
+  if(!asleep && millis() - last_active_ms > 240*1000)
+  {
+      asleep = true;
+      lcd.noBacklight();
+      catseye_red.setOnOffLevels(4,0);
+  }
+
+  // Printing
+  if(loop_cnt % 2000 == 0)
+  {
+    lcd.setCursor(0,0);
+    lcd.printf("Pwr: %3s, L:%3dk", status, loop_cnt/1000 % 1000);
+  }
+
+  // print the track current
+  if(loop_cnt % 2000 == 200)
+  {
+    lcd.setCursor(0,1);
+    lcd.printf("M:%4d mA, P:%4d mA",
+      main_track.raw2mA(main_track.getCurrentRaw()),
+      prog_track.raw2mA(prog_track.getCurrentRaw()));
+  }
+
+  if(loop_cnt % 2000 == 500)
+  {
+    IPAddress ip = WiFi.localIP();
+    lcd.setCursor(0,2);
+    lcd.printf("Clts: %3d, .%d", (uint32_t)num_clients,  ip[3]);
+  }
+
+
+  if(loop_cnt % 2000 == 500)
+  {
+    int freeNow = freeMemory();
+    lcd.setCursor(0,3);
+    lcd.printf("Free: %5db", freeNow);
+  }
+
 }

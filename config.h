@@ -110,7 +110,7 @@ The configuration file for DCC++ EX Command Station
 // To enable, uncomment one of the lines below
 
 // define LCD_DRIVER for I2C LCD address 0x3f,16 cols, 2 rows
-#define LCD_DRIVER  0x27,20,4
+// #define LCD_DRIVER  0x27,20,4 // 0x27, 0x3F
 
 //OR define OLED_DRIVER width,height in pixels (address auto detected)
 // This will not work on a UNO due to memory constraints
@@ -119,4 +119,4 @@ The configuration file for DCC++ EX Command Station
 /////////////////////////////////////////////////////////////////////////////////////
 //
 // Enable warning as memory gets depleted
-#define ENABLE_FREE_MEM_WARNING false
+#define ENABLE_FREE_MEM_WARNING true
