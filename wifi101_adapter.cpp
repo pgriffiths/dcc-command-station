@@ -81,10 +81,27 @@ void closeWiFiClientsOnTimeout(WiThrottleSessions* w, uint32_t timeout_ms)
 
       // Close the connection, drop the throttle
       WiThrottle::dropThrottle(wb->remotePort);
-      wb->client.stop();
+      //wb->client.stop();
       wb->remotePort = 0;
     }
   }
+}
+
+size_t openWiFiClients(WiThrottleSessions* w)
+{
+  size_t cnt = 0;
+
+  // First look for remote_port
+  for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
+  {
+    WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
+
+    if(wb->remotePort != 0)
+    {
+      cnt++;
+    }
+  }
+  return cnt;
 }
 
 void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
@@ -97,9 +114,7 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
 
   // Null terminate and send along to the command distributor
   wb->inboundLine[wb->inboundCnt++] = '\0';
-  Serial.println(F("cmd:"));
-  Serial.print(wb->inboundLine);
-  Serial.println();
+  Serial.printf("cmd(%d): %s\n", wb->remotePort, wb->inboundLine);
 
   // note that the remote_port number is the "clientId"
   // remember start of outbound data
@@ -108,6 +123,7 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
     wb->remotePort,
     (byte*)wb->inboundLine,
     &wb->outboundRing);
+
   // Compute the length---inserted after the mark---or roll back.
   wb->outboundRing.commit();
   // Reset line to empty
@@ -115,7 +131,7 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
 
   // Now send response in outboundRing
   int ch = 0;
-  Serial.println(F("Rsp:"));
+  Serial.printf("rsp(%d): ", wb->remotePort);
 
   if(wb->outboundRing.read() >= 0)
   {
@@ -129,6 +145,8 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
     }
     wb->outboundRing.flush();
   }
+
+  Serial.println(F("rsp--done"));
 
   // mark the time to keep the throttle and connection open
   wb->last_active_ms = millis();
@@ -159,7 +177,7 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
     // Freak out and close ALL connections
     // Gives us a chance to recover resources
     closeWiFiClientsOnTimeout(w, 0);
-    client.stop();
+    //client.stop();
     return;
   }
 
@@ -189,7 +207,9 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
   {
     // close the connection:
     Serial.println(F("disconnect"));
-    client.stop();
+
+    WiThrottle::dropThrottle(wb->remotePort);
+    //client.stop();
     wb->remotePort = 0;
   }
 }
