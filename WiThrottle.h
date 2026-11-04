@@ -31,7 +31,7 @@ class WiThrottle {
     static void loop(RingStream * stream);
     void parse(RingStream * stream, byte * cmd);
     static WiThrottle* getThrottle( int wifiClient);
-    static void dropThrottle(int wifiClient);
+    static void forget(byte clientId);
     static bool annotateLeftRight;
   private:
     WiThrottle( int wifiClientId);

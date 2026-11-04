@@ -8,30 +8,24 @@
 constexpr size_t INBOUND_LINE_MAX = 512;
 typedef struct
 {
-    int32_t remotePort;
+    bool inUse;
+    uint16_t remotePort;
     char inboundLine[INBOUND_LINE_MAX];
-    int32_t inboundCnt;
+    size_t inboundCnt;
     RingStream outboundRing;
 
     WiFiClient client;
     unsigned long last_active_ms;
 } WiThrottleBuffers;
 
+// The session index (not the remote port) is the clientId handed to
+// CommandDistributor/WiThrottle, so it must fit in a byte.
 constexpr size_t WITHROTTLE_SESSION_MAX = 8;
 typedef struct
 {
   WiThrottleBuffers withrottle_buffers[WITHROTTLE_SESSION_MAX];
 } WiThrottleSessions;
 
-typedef struct
-{
-  bool new_session;
-  bool found;
-  WiThrottleBuffers* wb;
-} FindPortResult;
-
-FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client);
-void portParserOneLine(WiThrottleBuffers* wb, Stream& out);
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w);
 size_t openWiFiClients(WiThrottleSessions* w);
 
