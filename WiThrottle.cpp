@@ -67,21 +67,15 @@ WiThrottle* WiThrottle::getThrottle( int wifiClient)
   return new WiThrottle( wifiClient);
 }
 
-void WiThrottle::dropThrottle(int wifiClient)
+void WiThrottle::forget(byte clientId)
 {
-  WiThrottle* wt;
-
-  for (wt=firstThrottle; wt!=NULL ; wt=wt->nextThrottle)
+  for (WiThrottle* wt=firstThrottle; wt!=NULL ; wt=wt->nextThrottle)
   {
-     if (wt->clientid==wifiClient)
+     if (wt->clientid==clientId)
      {
-        break;
+        delete wt;
+        return;
      }
-  }
-
-  if(wt!=NULL)
-  {
-    delete wt;
   }
 }
 
@@ -406,8 +400,13 @@ int WiThrottle::WiTToDCCSpeed(int WiTSpeed) {
 
 void WiThrottle::loop(RingStream * stream) {
   // for each WiThrottle, check the heartbeat
-  for (WiThrottle* wt=firstThrottle; wt!=NULL ; wt=wt->nextThrottle)
+  // checkHeartbeat() may delete wt, so take the next pointer first
+  WiThrottle* next;
+  for (WiThrottle* wt=firstThrottle; wt!=NULL ; wt=next)
+  {
+     next=wt->nextThrottle;
      wt->checkHeartbeat();
+  }
 
    // TODO... any broadcasts to be done
    (void)stream;

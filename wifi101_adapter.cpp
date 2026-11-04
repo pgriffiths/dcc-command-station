@@ -1,102 +1,117 @@
 #include "wifi101_adapter.h"
 #include "CommandDistributor.h"
 
-FindPortResult findThrottleAdapter(WiThrottleSessions* w, WiFiClient client)
+constexpr uint32_t SESSION_TIMEOUT_MS = 15000;
+
+// The WiFi101 library closes a socket itself (freeing its receive buffer) when
+// the peer disconnects, and may then hand the same socket number to a new
+// connection. Only treat the socket as ours if it is still connected to the
+// same remote port.
+static bool ownsSocket(WiThrottleBuffers* wb)
 {
-  // Is this a client we have seen before?
-  bool new_session = true;
-  bool found = false;
-  size_t idx;
-  int32_t remote_port = client.remotePort();
-
-  // First look for remote_port
-  for(idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
-  {
-    if(w->withrottle_buffers[idx].remotePort == remote_port)
-    {
-      new_session = false;
-      break;
-    }
-  }
-
-  // If this is a new_session, look for first available buffers (marked with remotePort==0)
-  if(new_session)
-  {
-    for(idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
-    {
-      if(w->withrottle_buffers[idx].remotePort == 0)
-      {
-        found = true;
-        break; // found!
-      }
-    }
-  }
-
-  // Setup new session
-  if(new_session && found)
-  {
-    // New client!
-    WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
-
-    // Create new parser, insert into map and get iterator to new element
-    Serial.print(F("New client on port: "));
-    Serial.println(remote_port);
-
-    Serial.print(F("idx: "));
-    Serial.println(idx);
-
-    // session is in use now!
-    wb->remotePort = remote_port;
-    wb->inboundCnt = 0;
-
-    // ensure ring buffer is clear
-    while(wb->outboundRing.read() >= 0)
-    {}
-
-    wb->client = client;
-    wb->last_active_ms = millis();
-  }
-
-  // whether new or not, the session is at index idx.
-  return (FindPortResult) {
-    .new_session = new_session,
-    .found = (idx != WITHROTTLE_SESSION_MAX),
-    .wb = &w->withrottle_buffers[idx]
-  };
+  return wb->client.connected() && wb->client.remotePort() == wb->remotePort;
 }
 
-void closeWiFiClientsOnTimeout(WiThrottleSessions* w, uint32_t timeout_ms)
+static void dropSession(WiThrottleSessions* w, size_t idx, const __FlashStringHelper* reason)
 {
-  uint32_t current_time_ms = millis();
+  WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
 
-  // First look for remote_port
+  Serial.print(reason);
+  Serial.print(F(" session "));
+  Serial.print(idx);
+  Serial.print(F(" port "));
+  Serial.println(wb->remotePort);
+
+  CommandDistributor::forget(idx);
+
+  // Releases the ATWINC1500 socket and the library's malloc'd receive buffer.
+  if(ownsSocket(wb))
+  {
+    wb->client.stop();
+  }
+
+  wb->client = WiFiClient();
+  wb->inUse = false;
+  wb->remotePort = 0;
+  wb->inboundCnt = 0;
+}
+
+static void reapSessions(WiThrottleSessions* w)
+{
+  uint32_t now_ms = millis();
+
   for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
   {
     WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
 
-    if(wb->remotePort != 0 && current_time_ms - wb->last_active_ms >= timeout_ms)
+    if(!wb->inUse)
     {
-      Serial.print(F("Timeout on port: "));
-      Serial.println(wb->remotePort);
+      continue;
+    }
 
-      // Close the connection, drop the throttle
-      WiThrottle::dropThrottle(wb->remotePort);
-      //wb->client.stop();
-      wb->remotePort = 0;
+    if(!ownsSocket(wb))
+    {
+      dropSession(w, idx, F("Disconnect"));
+    }
+    else if(now_ms - wb->last_active_ms >= SESSION_TIMEOUT_MS)
+    {
+      dropSession(w, idx, F("Timeout"));
     }
   }
+}
+
+static WiThrottleBuffers* findOrCreateSession(WiThrottleSessions* w, WiFiClient& client)
+{
+  uint16_t remote_port = client.remotePort();
+  WiThrottleBuffers* free_wb = nullptr;
+  size_t free_idx = 0;
+
+  for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
+  {
+    WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
+
+    if(wb->inUse && wb->client == client && wb->remotePort == remote_port)
+    {
+      return wb;
+    }
+
+    if(!wb->inUse && free_wb == nullptr)
+    {
+      free_wb = wb;
+      free_idx = idx;
+    }
+  }
+
+  if(free_wb == nullptr)
+  {
+    return nullptr;
+  }
+
+  Serial.print(F("New client on port: "));
+  Serial.print(remote_port);
+  Serial.print(F(" session: "));
+  Serial.println(free_idx);
+
+  free_wb->inUse = true;
+  free_wb->remotePort = remote_port;
+  free_wb->inboundCnt = 0;
+
+  // ensure ring buffer is clear
+  while(free_wb->outboundRing.read() >= 0)
+  {}
+
+  free_wb->client = client;
+  free_wb->last_active_ms = millis();
+  return free_wb;
 }
 
 size_t openWiFiClients(WiThrottleSessions* w)
 {
   size_t cnt = 0;
 
-  // First look for remote_port
   for(size_t idx = 0; idx < WITHROTTLE_SESSION_MAX; idx++)
   {
-    WiThrottleBuffers* wb = &w->withrottle_buffers[idx];
-
-    if(wb->remotePort != 0)
+    if(w->withrottle_buffers[idx].inUse)
     {
       cnt++;
     }
@@ -104,7 +119,7 @@ size_t openWiFiClients(WiThrottleSessions* w)
   return cnt;
 }
 
-void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
+static void portParserOneLine(WiThrottleBuffers* wb, byte clientId, Stream& out)
 {
   // Early exit on an empty line
   if(wb->inboundCnt == 0)
@@ -113,14 +128,13 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
   }
 
   // Null terminate and send along to the command distributor
-  wb->inboundLine[wb->inboundCnt++] = '\0';
-  Serial.printf("cmd(%d): %s\n", wb->remotePort, wb->inboundLine);
+  wb->inboundLine[wb->inboundCnt] = '\0';
+  Serial.printf("cmd(%d): %s\n", clientId, wb->inboundLine);
 
-  // note that the remote_port number is the "clientId"
   // remember start of outbound data
-  wb->outboundRing.mark(wb->remotePort);
+  wb->outboundRing.mark(clientId);
   CommandDistributor::parse(
-    wb->remotePort,
+    clientId,
     (byte*)wb->inboundLine,
     &wb->outboundRing);
 
@@ -131,13 +145,13 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
 
   // Now send response in outboundRing
   int ch = 0;
-  Serial.printf("rsp(%d): ", wb->remotePort);
+  Serial.printf("rsp(%d): ", clientId);
 
   if(wb->outboundRing.read() >= 0)
   {
     int count=wb->outboundRing.count();
 
-    for(size_t j = 0; j < count; j++)
+    for(int j = 0; j < count; j++)
     {
       ch = wb->outboundRing.read();
       Serial.write(ch);
@@ -154,9 +168,12 @@ void portParserOneLine(WiThrottleBuffers* wb, Stream& out)
 
 void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
 {
-  constexpr uint32_t TIMEOUT_MS = 15000;
+  // Reap before available(): a socket the library closed and re-accepted for
+  // a new peer is not "connected" until available() promotes it.
+  reapSessions(w);
 
-  closeWiFiClientsOnTimeout(w, TIMEOUT_MS);
+  // WiThrottle heartbeat: eStop locos of clients that have gone quiet.
+  WiThrottle::loop(nullptr);
 
   // Return any client with input avaiable
   WiFiClient client = s->available();
@@ -168,48 +185,34 @@ void portParserLoop(WiFiServer *s, WiThrottleSessions* w)
     return;
   }
 
-  // Find or establish a throttle for the client
-  auto it = findThrottleAdapter(w, client);
+  WiThrottleBuffers* wb = findOrCreateSession(w, client);
 
-  if(!it.found)
+  if(wb == nullptr)
   {
-    Serial.println(F("No session available. Closing everything!"));
-    // Freak out and close ALL connections
-    // Gives us a chance to recover resources
-    closeWiFiClientsOnTimeout(w, 0);
-    //client.stop();
+    Serial.println(F("No session available, refusing client"));
+    client.stop();
     return;
   }
 
-  WiThrottleBuffers* wb = it.wb;
+  byte clientId = (byte)(wb - w->withrottle_buffers);
 
-  // Read data if connected -- else close
-  if(client.connected())
+  int ch = client.read();
+
+  // New-line marks the end of a withrottle statment
+  if(ch == '\r' || ch == '\n')
   {
-    // Read until a line break
-    int ch = client.read();
-
-    // New-line marks the end of a withrottle statment
-    if(ch == '\r' || ch == '\n')
-    {
-      portParserOneLine(wb, client);
-    }
-    else // Not a new line, just add to input
-    {
-      if(ch > 0)
-      {
-        wb->inboundLine[wb->inboundCnt++] = (char)ch;
-        // handle over-flow of line buffer!!!
-      }
-    }
+    portParserOneLine(wb, clientId, client);
   }
-  else
+  else if(ch > 0)
   {
-    // close the connection:
-    Serial.println(F("disconnect"));
-
-    WiThrottle::dropThrottle(wb->remotePort);
-    //client.stop();
-    wb->remotePort = 0;
+    if(wb->inboundCnt < INBOUND_LINE_MAX - 1)
+    {
+      wb->inboundLine[wb->inboundCnt++] = (char)ch;
+    }
+    else
+    {
+      Serial.println(F("Inbound line too long, discarding"));
+      wb->inboundCnt = 0;
+    }
   }
 }

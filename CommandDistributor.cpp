@@ -41,3 +41,8 @@ void  CommandDistributor::parse(byte clientId,byte * buffer, RingStream * stream
     WiThrottle::getThrottle(clientId)->parse(streamer, buffer);
   }
 }
+
+void CommandDistributor::forget(byte clientId)
+{
+  WiThrottle::forget(clientId);
+}

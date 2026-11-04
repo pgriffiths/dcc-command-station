@@ -25,6 +25,7 @@ class CommandDistributor {
 
 public :
   static void parse(byte clientId,byte* buffer, RingStream * streamer);
+  static void forget(byte clientId);
 private:
    static DCCEXParser * parser;
 };
