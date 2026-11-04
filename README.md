@@ -58,3 +58,126 @@ NOTE: DCC-EX is a major rewrite to the code. We started over and rebuilt it from
 You can learn more at the [DCC++ EX website](https://dcc-ex.com/)
 
 - November 14, 2020
+
+---
+
+# Building and flashing for the Adafruit Feather M0 (samd_zero fork)
+
+This fork adds a ``[env:feather-m0]`` PlatformIO environment targeting the
+Adafruit Feather M0 (SAMD21, 48 MHz, 256 KB flash) with WiFi101, a 20x4 I2C LCD,
+an external I2C EEPROM, and the catseye pushbutton UI.
+
+The headers ``debounce.h``, ``periodic_trigger.h`` and ``smooth_on_off.h`` are
+vendored under ``lib/pg_sigs/src`` (a minimal subset of
+https://github.com/pgriffiths/pg_signals_sytems). ``debounce.h`` here has the
+two setter signatures uncommented so it compiles; upstream HEAD has them
+commented out.
+
+## 1. Install PlatformIO
+
+Requires Python 3.9+ (``python`` / ``python3``):
+
+```sh
+pip install platformio
+```
+
+Verify:
+
+```sh
+pio --version
+```
+
+If ``pio`` is not on PATH, use ``python -m platformio`` in place of ``pio``
+below (or add ``<python>/Scripts`` / ``~/.local/bin`` to PATH).
+
+## 2. Configure WiFi credentials
+
+The sketch includes ``arduino_secrets.h`` (gitignored). Create it:
+
+```sh
+cp arduino_secrets.example.h arduino_secrets.h
+# Windows: copy arduino_secrets.example.h arduino_secrets.h
+```
+
+then edit it and set ``SECRET_SSID`` / ``SECRET_PASS``.
+
+## 3. Build
+
+```sh
+pio run
+```
+
+Produces ``.pio/build/feather-m0/firmware.bin``.
+
+## 4. Find the bossac upload tool
+
+PlatformIO installs bossac into its packages directory:
+
+- Windows: ``%USERPROFILE%\.platformio\packages\tool-bossac\bossac.exe``
+- macOS:   ``~/.platformio/packages/tool-bossac/bossac``
+- Linux:   ``~/.platformio/packages/tool-bossac/bossac``
+
+Alternatively install BOSSA (https://github.com/shumatech/BOSSA) from your OS
+package manager. Note that ``pio run -t upload`` also works when the board is
+already in bootloader mode (see next step).
+
+## 5. Put the board in bootloader mode
+
+Double-tap the RESET button quickly. The red LED starts to pulse/"breathe" and
+a *new* serial port appears - it is NOT the port the sketch normally uses.
+On Windows check Device Manager or:
+
+```powershell
+[System.IO.Ports.SerialPort]::GetPortNames()
+```
+
+On Linux/macOS: ``ls /dev/ttyACM* /dev/tty.usbmodem*`` or ``pio device list``.
+The bootloader port only exists while the bootloader runs; if your earlier
+flash left a broken image, the bootloader is still always reachable this way.
+
+## 6. Flash
+
+```sh
+bossac -p <PORT> -U true -i -e -w -v .pio/build/feather-m0/firmware.bin
+```
+
+- Windows: ``-p COM4`` ; Linux: ``-p /dev/ttyACM0`` ; macOS: ``-p /dev/tty.usbmodemXXXX``
+- This bossac (1.7.0) has no ``-o``/``--offset`` option - it automatically
+  writes starting at 0x2000, above the 8 KB bootloader, which is never touched.
+- ``-e`` erases the app area, ``-w`` writes, ``-v`` verifies, ``-U true`` forces
+  USB-port detection, ``-i`` prints device info.
+
+Press RESET once afterwards to start the firmware.
+
+## 7. Read back / verify (optional)
+
+```sh
+bossac -p <PORT> -U true -r readback.bin
+```
+
+Reads the whole application area (253952 bytes). The first ``firmware.bin``
+length bytes should match ``firmware.bin``; the rest is 0xFF apart from up to
+63 bytes of page padding.
+
+## 8. Monitor serial output
+
+After reset, find the sketch's COM port (different from the bootloader port)
+and run:
+
+```sh
+pio device monitor -p <PORT> -b 115200
+```
+
+The ``<iDCC-EX V-...>`` banner and ``DCC Init...`` lines appear at startup.
+
+## Known-good versions (tested 2026-11)
+
+- PlatformIO Core 6.2.0, platform ``atmelsam`` 9.0.0
+- framework-arduino-samd-adafruit 1.7.16, toolchain gcc 9.3.1
+- Libraries: WiFi101 0.16.1, LiquidCrystal_I2C 1.1.4,
+  SparkFun External EEPROM 3.2.13
+- Firmware size ~76.7 KB (29% of flash), RAM ~12.2 KB
+
+Note: the image historically running on this hardware was built with the
+Arduino IDE + Adafruit SAMD core 1.6.5, so it is not byte-identical to a
+PlatformIO build, but all application strings match.
